@@ -1,0 +1,43 @@
+name: SageMaker ML CI CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: sagemaker-lab
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AWS_REGION: us-east-1
+      SAGEMAKER_ROLE_ARN: ${{ vars.SAGEMAKER_ROLE_ARN }}
+      S3_BUCKET: ${{ vars.S3_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run pipeline
+        run: python pipeline.py
+      - name: Deploy model
+        run: python deploy.py
+      - name: Check endpoint
+        run: |
+          aws sagemaker describe-endpoint \
+            --endpoint-name cancer-classification-endpoint \
+            --query EndpointStatus
